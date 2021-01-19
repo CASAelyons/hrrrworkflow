@@ -14,7 +14,7 @@ from argparse import ArgumentParser
 
 
 class hrrrWorkflow(object):
-    def __init__(self, configfile, featurename, prodName, hazardType, comparison_str, threshold, alertURL, usrname, password):
+    def __init__(self, configfile, featurename, prodName, hazardType, comparison_str, threshold, inputfile):
         
         self.configfile = configfile
         self.featurename = '"' + featurename + '"'
@@ -22,9 +22,7 @@ class hrrrWorkflow(object):
         self.hazardType = '"' + hazardType + '"'
         self.comparison_str = '"' + comparison_str + '"'
         self.threshold = threshold
-        self.alertURL = '"' + alertURL + '"'
-        self.usrname = usrname
-        self.password = password
+        self.inputfile = inputfile
 
     def generate_jobs(self):
         
@@ -33,40 +31,39 @@ class hrrrWorkflow(object):
 
         hrrrconfigfile = File("d3hrrr_config.txt")
         #hrrrconfigfile = File(self.configfile)
-
-        usrpass = self.usrname + ":" + self.password
         
-        d3_job = Job("d3_hrrr")
-        d3_job.addArguments("-c", hrrrconfigfile)
-        d3_job.addArguments("-n", self.featurename)
-        d3_job.addArguments("-p", self.prodName)
-        d3_job.addArguments("-H", self.hazardType)
-        d3_job.addArguments("-e", self.comparison_str)
-        d3_job.addArguments("-t", self.threshold)
-        d3_job.addArguments("-t", self.alertURL) 
-        d3_job.addArguments("-u", usrpass)
-        wf.addJob(d3_job)
+        inputfile = File("latest_hrrr_80mWinds.netcdf")
+        #inputfile = File(self.inputfile)
+
+        d3_job = Job("d3_hrrr")\
+                 .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
+                 .add_inputs(hrrrconfigfile, inputfile)
+        wf.add_jobs(d3_job)
+
+        try:
+            wf.plan(submit=True)
+            wf.wait()
+            wf.analyze()
+            wf.statistics()
+        except PegasusClientError as e:
+            print(e)
 
     def generate_workflow(self):
         # Generate dax
         self.generate_jobs()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+
     parser = ArgumentParser(description="HRRR Workflow")
     parser.add_argument("-c", "--configfile", metavar="CONFIG_FILE", type=str, help="Path to config file", required=True)
     parser.add_argument("-l", "--flights", metavar="FLIGHT_QUERY_URL", type=str, help="URL to query flights", required=True)
-    parser.add_argument("-t", "--alertURL", metavar="ALERT_URL", type=str, help="URL to post output", required=True)
-    parser.add_argument("-u", "--usrname", metavar="USR", type=str, help="username for query authentication", required=True)
-    parser.add_argument("-p", "--password", metavar="PASS", type=str, help="password for query authentication", required=True)
+    parser.add_argument("-i", "--inputfile", metavar="INPUT_FILE", type=str, help="Path to input netcdf file", required=True)
 
     args = parser.parse_args()
     configfile = args.configfile
     flights = args.flights
-    alertURL = args.alertURL
-    usrname = args.usrname
-    password = args.password
-    
-    CASA_AUTH = (usrname,password) 
+    inputfile = args.inputfile
 
     try: 
         response = requests.get(flights, auth=CASA_AUTH, verify=True)
@@ -192,6 +189,5 @@ if __name__ == '__main__':
                 if hazardType == "WINDS_80M":
                     print("alert on 80M winds " + comparison + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    #workflow = hrrrWorkflow(featname,flights,alertURL,usrname,password)
-                    workflow = hrrrWorkflow(configfile, featname, prodName, hazardType, comparison_str, threshold, alertURL, usrname, password)
+                    workflow = hrrrWorkflow(configfile, featname, prodName, hazardType, comparison_str, threshold, inputfile)
                     workflow.generate_workflow()
