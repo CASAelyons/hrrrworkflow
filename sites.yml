@@ -1,0 +1,44 @@
+---
+pegasus: "5.0"
+sites:
+ -
+  name: "condorpool_nfs"
+  arch: "x86_64"
+  os.type: "linux"
+  directories:
+   -
+    type: "sharedScratch"
+    path: "/nfs/shared/ldm/hrrr"
+    fileServers:
+     -
+      operation: "all"
+      url: "file:///nfs/shared/ldm/hrrr"
+  profiles:
+    condor:
+      universe: "vanilla"
+    pegasus:
+      clusters.size: "32"
+      cores: "4"
+      data.configuration: "nonsharedfs"
+      memory: "2048"
+      style: "condor"
+ -
+  name: "local"
+  arch: "x86_64"
+  os.type: "linux"
+  directories:
+   -
+    type: "sharedScratch"
+    path: "${PWD}/scratch"
+    fileServers:
+     -
+      operation: "all"
+      url: "file://${PWD}/scratch"
+   -
+    type: "sharedStorage"
+    path: "${PWD}/output"
+    fileServers:
+     -
+      operation: "all"
+      url: "file://${PWD}/output"
+

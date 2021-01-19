@@ -1,0 +1,27 @@
+# file-based transformation catalog in yaml : 2021-01-19T15:31:26.228+00:00
+---
+pegasus: "5.0"
+transformations:
+ -
+  name: "d3hrrr"
+  sites:
+   -
+    name: "condorpool_nfs"
+    type: "installed"
+    pfn: "/opt/d3_hrrr/route_plan"
+    bypass: false
+    arch: "x86_64"
+    os.type: "linux"
+    profiles:
+      pegasus:
+        cores: "1"
+    container: "d3hrrr_container"
+containers:
+ -
+  name: "d3hrrr_container"
+  type: "singularity"
+  image: "file:///nfs/shared/ldm/d3_hrrr_singularity.img"
+  image.site: "condorpool_nfs"
+  bypass: false
+  mounts:
+   - "/nfs/shared:/nfs/shared"

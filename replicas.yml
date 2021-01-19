@@ -1,0 +1,16 @@
+# file-based replica catalog in yaml : 2021-01-19T15:46:43.456+00:00
+---
+pegasus: "5.0"
+replicas:
+ -
+  lfn: "latest_hrrr_80mWinds.netcdf"
+  pfns:
+   -
+    pfn: "file://nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf"
+    site: "local"
+ -
+  lfn: "d3hrrr_config.txt"
+  pfns:
+   -
+    pfn: "file://${PWD}/input/d3_hrrr_config.txt"
+    site: "local"
