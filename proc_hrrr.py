@@ -35,6 +35,32 @@ class hrrrWorkflow(object):
         inputfile = File("latest_hrrr_80mWinds.netcdf")
         #inputfile = File(self.inputfile)
 
+        rc = ReplicaCatalog()\
+             .add_replica("local", hrrrconfigfile, "/home/ldm/hrrrworkflow/input/d3_hrrr_config.txt")\
+             .add_replica("condorpool_nfs", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
+
+        localsite = Site("local", arch=X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")\
+            .add_directories(
+                Directory(Directory.LOCAL_SCRATCH, "/home/ldm/hrrrworkflow/scratch")
+                .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/scratch", Operation.ALL)),
+                Directory(Directory.LOCAL_STORAGE, "/home/ldm/hrrrworkflow/output")
+                .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/output", Operation.ALL))
+            )
+        
+        sharedsite = Site("condorpool_nfs", arch=X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")\
+            .add_directories(
+                Directory(Directory.SHARED_SCRATCH, "/nfs/shared/ldm/hrrr")
+                .add_file_servers(FileServer("file:///nfs/shared/ldm/hrrr", Operation.ALL))
+            )\
+            .add_pegasus_profile(clusters_size=32)\
+            .add_pegasus_profile(cores=4)\
+            .add_pegasus_profile(data_configuration="nonsharedfs")\
+            .add_pegasus_profile(memory=2048)\
+            .add_pegasus_profile(style="condor")\
+            .add_condor_profile(universe="vanilla")
+
+        sc.add_sites(localsite, sharedsite)
+        
         d3_job = Job("d3_hrrr")\
                  .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
                  .add_inputs(hrrrconfigfile, inputfile)
