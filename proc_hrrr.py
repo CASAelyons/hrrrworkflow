@@ -83,18 +83,22 @@ class hrrrWorkflow(object):
              .add_containers(d3hrrr_container)\
              .add_transformations(d3hrrr_transformation)
             
-        d3_job = Job("d3_hrrr")\
-                 .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
-                 .add_inputs(hrrrconfigfile, inputfile)
+        d3_job = Job(d3hrrr_transformation)\
+            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
+            .add_inputs(hrrrconfigfile, inputfile)
+        
         wf.add_jobs(d3_job)
-
+        wf.add_site_catalog(sc)
+        wf.add_replica_catalog(rc)
+        wf.add_transformation_catalog(tc)
+        
         try:
             wf.plan(submit=True)
             wf.wait()
             wf.analyze()
             wf.statistics()
         except PegasusClientError as e:
-            print(e)
+            print(e.output)
 
     def generate_workflow(self):
         # Generate dax
