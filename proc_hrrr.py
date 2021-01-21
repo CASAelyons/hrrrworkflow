@@ -29,16 +29,6 @@ class hrrrWorkflow(object):
         ts = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
         wf = Workflow("casa_hrrr_wf-%s" % ts)
 
-        hrrrconfigfile = File("d3hrrr_config.txt")
-        #hrrrconfigfile = File(self.configfile)
-        
-        inputfile = File("latest_hrrr_80mWinds.netcdf")
-        #inputfile = File(self.inputfile)
-
-        rc = ReplicaCatalog()\
-             .add_replica("local", hrrrconfigfile, "/home/ldm/hrrrworkflow/input/d3_hrrr_config.txt")\
-             .add_replica("condorpool_nfs", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
-
         localsite = Site("local", arch=X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")\
             .add_directories(
                 Directory(Directory.LOCAL_SCRATCH, "/home/ldm/hrrrworkflow/scratch")
@@ -60,7 +50,39 @@ class hrrrWorkflow(object):
             .add_condor_profile(universe="vanilla")
 
         sc.add_sites(localsite, sharedsite)
+
+        hrrrconfigfile = File("d3hrrr_config.txt")
+        #hrrrconfigfile = File(self.configfile)
+        inputfile = File("latest_hrrr_80mWinds.netcdf")
+        #inputfile = File(self.inputfile)
         
+        rc = ReplicaCatalog()\
+             .add_replica("local", hrrrconfigfile, "/home/ldm/hrrrworkflow/input/d3_hrrr_config.txt")\
+             .add_replica("condorpool_nfs", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
+
+        d3hrrr_container = Container(
+            name="d3hrrr_container",
+            container_type=Container.SINGULARITY,
+            image="file:///nfs/shared/ldm/d3_hrrr_singularity.img",
+            image_site="condorpool_nfs",
+            bypass_staging=false,
+            mounts=["/nfs/shared:/nfs/shared"]
+        )
+        
+        d3hrrr_transformation = Transformation(
+            name="d3hrrr",
+            site="condorpool_nfs",
+            pfn="/opt/d3_hrrr/d3_hrrr"
+            arch=Arch.X86_64,
+            os_type=OS.LINUX,
+            bypass_staging=false,
+            container=d3hrrr_container
+        )
+        
+        tc = TransformationCatalog()\
+             .add_containers(d3hrrr_container)\
+             .add_transformations(d3hrrr_transformation)
+            
         d3_job = Job("d3_hrrr")\
                  .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
                  .add_inputs(hrrrconfigfile, inputfile)
