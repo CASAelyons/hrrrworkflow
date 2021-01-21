@@ -5,11 +5,11 @@ import os
 import pwd
 #import time
 import logging
-#import requests
-#import json, geojson, time, socket, subprocess, pytz, certifi, urllib3
+import requests
+import json, geojson, time, socket, subprocess, pytz, certifi, urllib3
 from pathlib import Path
 from Pegasus.api import *
-#from datetime import datetime
+from datetime import datetime
 from argparse import ArgumentParser
 
 
@@ -72,7 +72,7 @@ class hrrrWorkflow(object):
         d3hrrr_transformation = Transformation(
             name="d3hrrr",
             site="condorpool_nfs",
-            pfn="/opt/d3_hrrr/d3_hrrr"
+            pfn="/opt/d3_hrrr/d3_hrrr",
             arch=Arch.X86_64,
             os_type=OS.LINUX,
             bypass_staging=false,
@@ -118,7 +118,8 @@ if __name__ == '__main__':
     inputfile = args.inputfile
 
     try: 
-        response = requests.get(flights, auth=CASA_AUTH, verify=True)
+        #response = requests.get(flights, auth=CASA_AUTH, verify=True)
+        response = requests.get(flights, verify=True)
         if response.status_code == 200:
             liveEvents = geojson.loads(response.content)
         else:
@@ -164,16 +165,16 @@ if __name__ == '__main__':
             print("No startTime associated with this feature. Skipping this feature")
             continue
 
-        startdt = datetime.strptime(featStart, "%Y-%m-%dT%H:%M:%S%z");
+        #startdt = datetime.strptime(featStart, "%Y-%m-%dT%H:%M:%S%z");
 
         featEnd = featProperties.get('endTime')
         if featEnd is None:
             print("No endTime associated with this feature. Skipping this feature")
             continue
 
-        enddt = datetime.strptime(featEnd, "%Y-%m-%dT%H:%M:%S%z");
+        #enddt = datetime.strptime(featEnd, "%Y-%m-%dT%H:%M:%S%z");
 
-        flightTimeCouplet = (startdt.timestamp(), enddt.timestamp())
+        #flightTimeCouplet = (startdt.timestamp(), enddt.timestamp())
 
         featGeometry = feature.get('geometry')
         if featGeometry is None:
@@ -238,8 +239,10 @@ if __name__ == '__main__':
                     print("unknown distance units.  skipping this parameter")
                     continue
                     
-                if hazardType == "WINDS_80M":
-                    print("alert on 80M winds " + comparison + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName
+                #if hazardType == "WINDS_80M":
+                if hazardType == "STORM_CASA_10":
+                    #print("comparison: " + comparison)
+                    #print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    workflow = hrrrWorkflow(configfile, featname, prodName, hazardType, comparison_str, threshold, inputfile)
-                    workflow.generate_workflow()
+                    #workflow = hrrrWorkflow(configfile, featname, prodName, hazardType, comparison_str, threshold, inputfile)
+                    #workflow.generate_workflow()
