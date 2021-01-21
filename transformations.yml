@@ -8,7 +8,7 @@ transformations:
    -
     name: "condorpool_nfs"
     type: "installed"
-    pfn: "/opt/d3_hrrr/route_plan"
+    pfn: "/opt/d3_hrrr/d3_hrrr"
     bypass: false
     arch: "x86_64"
     os.type: "linux"
