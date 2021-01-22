@@ -29,27 +29,29 @@ class hrrrWorkflow(object):
         ts = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
         wf = Workflow("casa_hrrr_wf-%s" % ts)
 
-        localsite = Site("local", arch=X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")\
-            .add_directories(
-                Directory(Directory.LOCAL_SCRATCH, "/home/ldm/hrrrworkflow/scratch")
-                .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/scratch", Operation.ALL)),
-                Directory(Directory.LOCAL_STORAGE, "/home/ldm/hrrrworkflow/output")
-                .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/output", Operation.ALL))
-            )
+        sc = SiteCatalog()
         
-        sharedsite = Site("condorpool_nfs", arch=X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")\
-            .add_directories(
-                Directory(Directory.SHARED_SCRATCH, "/nfs/shared/ldm/hrrr")
-                .add_file_servers(FileServer("file:///nfs/shared/ldm/hrrr", Operation.ALL))
-            )\
-            .add_pegasus_profile(clusters_size=32)\
-            .add_pegasus_profile(cores=4)\
-            .add_pegasus_profile(data_configuration="nonsharedfs")\
-            .add_pegasus_profile(memory=2048)\
-            .add_pegasus_profile(style="condor")\
-            .add_condor_profile(universe="vanilla")
+        shared_scratch = Directory(Directory.SHARED_SCRATCH, path="/nfs/shared/hrrr/scratch")\
+                .add_file_servers(FileServer("file:///nfs/shared/hrrr/scratch", Operation.ALL))
 
-        sc.add_sites(localsite, sharedsite)
+        local_storage = Directory(Directory.LOCAL_STORAGE, "/home/ldm/hrrrworkflow/output")\
+                .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/output", Operation.ALL))
+        
+        local = Site("local", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+
+        local.add_directories(shared_scratch,local_storage)
+        
+        exec_site = Site("condorpool", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+        exec_site.add_directories(shared_scratch)\
+                .add_pegasus_profile(clusters_size=32)\
+                .add_pegasus_profile(cores=4)\
+                .add_pegasus_profile(data_configuration="nonsharedfs")\
+                .add_pegasus_profile(memory=2048)\
+                .add_pegasus_profile(style="condor")\
+                .add_condor_profile(universe="vanilla")\
+                .add_profiles(Namespace.PEGASUS)
+
+        sc.add_sites(local, exec_site)
 
         hrrrconfigfile = File("d3hrrr_config.txt")
         #hrrrconfigfile = File(self.configfile)
@@ -57,34 +59,36 @@ class hrrrWorkflow(object):
         #inputfile = File(self.inputfile)
         
         rc = ReplicaCatalog()\
-             .add_replica("local", hrrrconfigfile, "/home/ldm/hrrrworkflow/input/d3_hrrr_config.txt")\
-             .add_replica("condorpool_nfs", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
+             .add_replica("local", hrrrconfigfile, "/nfs/shared/hrrr/d3_hrrr_config.txt")\
+             .add_replica("local", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
 
         d3hrrr_container = Container(
             name="d3hrrr_container",
             container_type=Container.SINGULARITY,
             image="file:///nfs/shared/ldm/d3_hrrr_singularity.img",
-            image_site="condorpool_nfs",
-            bypass_staging=false,
+            image_site="condorpool",
+            bypass_staging=False,
             mounts=["/nfs/shared:/nfs/shared"]
         )
         
         d3hrrr_transformation = Transformation(
             name="d3hrrr",
-            site="condorpool_nfs",
+            site="condorpool",
             pfn="/opt/d3_hrrr/d3_hrrr",
             arch=Arch.X86_64,
             os_type=OS.LINUX,
-            bypass_staging=false,
-            container=d3hrrr_container
+            bypass_staging=False,
+            container="d3hrrr_container"
         )
         
         tc = TransformationCatalog()\
              .add_containers(d3hrrr_container)\
              .add_transformations(d3hrrr_transformation)
             
+        props = Properties()
+
         d3_job = Job(d3hrrr_transformation)\
-            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodName, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
+            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodname, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
             .add_inputs(hrrrconfigfile, inputfile)
         
         wf.add_jobs(d3_job)
@@ -239,10 +243,11 @@ if __name__ == '__main__':
                     print("unknown distance units.  skipping this parameter")
                     continue
                     
-                #if hazardType == "WINDS_80M":
-                if hazardType == "STORM_CASA_10":
+                if hazardType == "WINDS_80M":
                     #print("comparison: " + comparison)
-                    #print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
+                    print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
+                    prodName = "WindSpeed"
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    #workflow = hrrrWorkflow(configfile, featname, prodName, hazardType, comparison_str, threshold, inputfile)
-                    #workflow.generate_workflow()
+                    workflow = hrrrWorkflow(configfile, featName, prodName, hazardType, comparison_str, threshold, inputfile)
+                    workflow.generate_workflow()
+                
