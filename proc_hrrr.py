@@ -14,11 +14,10 @@ from argparse import ArgumentParser
 
 
 class hrrrWorkflow(object):
-    def __init__(self, configfile, featurename, prodName, hazardType, comparison_str, threshold, inputfile):
+    def __init__(self, configfile, featurename, hazardType, comparison_str, threshold, inputfile):
         
         self.configfile = configfile
         self.featurename = '"' + featurename + '"'
-        self.prodname = '"' + prodName + '"'
         self.hazardType = '"' + hazardType + '"'
         self.comparison_str = '"' + comparison_str + '"'
         self.threshold = threshold
@@ -95,7 +94,7 @@ class hrrrWorkflow(object):
         props.write()
 
         d3_job = Job(d3hrrr_transformation)\
-            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodname, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
+            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
             .add_inputs(hrrrconfigfile, inputfile)
         
         wf.add_jobs(d3_job)
@@ -235,6 +234,12 @@ if __name__ == '__main__':
 
                 threshold_units = parameter.get('thresholdUnits')
                 threshold = parameter.get('threshold')
+
+                if threshold_units == 'mph':
+                    threshold = threshold * 0.868976
+                elif threshold_units == 'kts':
+                    threshold = threshold * 1.934
+
                 distance_units = parameter.get('distanceUnits')
                 distance = parameter.get('distance')
                 
@@ -253,8 +258,7 @@ if __name__ == '__main__':
                 if hazardType == "WINDS_80M":
                     #print("comparison: " + comparison)
                     print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
-                    prodName = "WindSpeed"
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    workflow = hrrrWorkflow(configfile, featName, prodName, hazardType, comparison_str, threshold, inputfile)
+                    workflow = hrrrWorkflow(configfile, featName, hazardType, comparison_str, threshold, inputfile)
                     workflow.generate_workflow()
 
