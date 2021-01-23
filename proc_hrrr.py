@@ -34,14 +34,19 @@ class hrrrWorkflow(object):
         shared_scratch = Directory(Directory.SHARED_SCRATCH, path="/nfs/shared/hrrr/scratch")\
                 .add_file_servers(FileServer("file:///nfs/shared/hrrr/scratch", Operation.ALL))
 
+        #container_location = Directory(Directory.SHARED_STORAGE, path="/nfs/shared/ldm")\
+        #        .add_file_servers(FileServer("file:///nfs/shared/ldm", Operation.ALL))
+
         local_storage = Directory(Directory.LOCAL_STORAGE, "/home/ldm/hrrrworkflow/output")\
                 .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/output", Operation.ALL))
         
         local = Site("local", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
 
+        #local.add_directories(shared_scratch,local_storage, container_location)
         local.add_directories(shared_scratch,local_storage)
-        
-        exec_site = Site("condorpool", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+
+        #exec_site = Site("condorpool", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+        exec_site = Site("condorpool")
         exec_site.add_directories(shared_scratch)\
                 .add_pegasus_profile(clusters_size=32)\
                 .add_pegasus_profile(cores=4)\
@@ -49,7 +54,10 @@ class hrrrWorkflow(object):
                 .add_pegasus_profile(memory=2048)\
                 .add_pegasus_profile(style="condor")\
                 .add_condor_profile(universe="vanilla")\
+                .add_pegasus_profile(auxillary_local="true")\
                 .add_profiles(Namespace.PEGASUS)
+
+        #exec_site.add_directories(shared_scratch, container_location)
 
         sc.add_sites(local, exec_site)
 
@@ -57,10 +65,10 @@ class hrrrWorkflow(object):
         #hrrrconfigfile = File(self.configfile)
         inputfile = File("latest_hrrr_80mWinds.netcdf")
         #inputfile = File(self.inputfile)
-        
+
         rc = ReplicaCatalog()\
              .add_replica("local", hrrrconfigfile, "/nfs/shared/hrrr/d3_hrrr_config.txt")\
-             .add_replica("local", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
+             .add_replica("condorpool", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
 
         d3hrrr_container = Container(
             name="d3hrrr_container",
@@ -75,17 +83,16 @@ class hrrrWorkflow(object):
             name="d3hrrr",
             site="condorpool",
             pfn="/opt/d3_hrrr/d3_hrrr",
-            arch=Arch.X86_64,
-            os_type=OS.LINUX,
             bypass_staging=False,
-            container="d3hrrr_container"
+            container=d3hrrr_container
         )
         
         tc = TransformationCatalog()\
-             .add_containers(d3hrrr_container)\
-             .add_transformations(d3hrrr_transformation)
+            .add_containers(d3hrrr_container)\
+            .add_transformations(d3hrrr_transformation)
             
         props = Properties()
+        props.write()
 
         d3_job = Job(d3hrrr_transformation)\
             .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-p", self.prodname, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
@@ -150,7 +157,7 @@ if __name__ == '__main__':
     features = liveEvents.get('features')
 
     if features is None:
-        print('No features found.  Exiting')
+        print('No flights found.  Exiting')
         exit
 
     for feature in features:
@@ -250,4 +257,4 @@ if __name__ == '__main__':
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
                     workflow = hrrrWorkflow(configfile, featName, prodName, hazardType, comparison_str, threshold, inputfile)
                     workflow.generate_workflow()
-                
+
