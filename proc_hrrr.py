@@ -13,12 +13,11 @@ from datetime import datetime
 from argparse import ArgumentParser
 
 
-class hrrrWorkflow(object):
-    def __init__(self, configfile, featurename, hazardType, comparison_str, threshold, inputfile):
+class hrrrWindspeedWorkflow(object):
+    def __init__(self, configfile, featurename, comparison_str, threshold, inputfile):
         
         self.configfile = configfile
         self.featurename = '"' + featurename + '"'
-        self.hazardType = '"' + hazardType + '"'
         self.comparison_str = '"' + comparison_str + '"'
         self.threshold = threshold
         self.inputfile = inputfile
@@ -60,19 +59,19 @@ class hrrrWorkflow(object):
 
         sc.add_sites(local, exec_site)
 
-        hrrrconfigfile = File("d3hrrr_config.txt")
+        hrrrconfigfile = File("d3_hrrr_windspeed.cfg")
         #hrrrconfigfile = File(self.configfile)
         inputfile = File("latest_hrrr_80mWinds.netcdf")
         #inputfile = File(self.inputfile)
 
         rc = ReplicaCatalog()\
-             .add_replica("local", hrrrconfigfile, "/nfs/shared/hrrr/d3_hrrr_config.txt")\
+             .add_replica("condorpool", hrrrconfigfile, "/nfs/shared/hrrr/d3_hrrr_windspeed.cfg")\
              .add_replica("condorpool", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
 
         d3hrrr_container = Container(
             name="d3hrrr_container",
             container_type=Container.SINGULARITY,
-            image="file:///nfs/shared/ldm/d3_hrrr_singularity.img",
+            image="file:///nfs/shared/ldm/d3_hrrr_windspeed_singularity.img",
             image_site="condorpool",
             bypass_staging=False,
             mounts=["/nfs/shared:/nfs/shared"]
@@ -81,7 +80,7 @@ class hrrrWorkflow(object):
         d3hrrr_transformation = Transformation(
             name="d3hrrr",
             site="condorpool",
-            pfn="/opt/d3_hrrr/d3_hrrr",
+            pfn="/opt/d3_hrrr_windspeed/d3_hrrr_windspeed",
             bypass_staging=False,
             container=d3hrrr_container
         )
@@ -94,9 +93,9 @@ class hrrrWorkflow(object):
         props.write()
 
         d3_job = Job(d3hrrr_transformation)\
-            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-H", self.hazardType, "-e", self.comparison_str, "-t", self.threshold, self.inputfile)\
+            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-e", self.comparison_str, "-t", self.threshold, inputfile)\
             .add_inputs(hrrrconfigfile, inputfile)
-        
+
         wf.add_jobs(d3_job)
         wf.add_site_catalog(sc)
         wf.add_replica_catalog(rc)
@@ -174,7 +173,10 @@ if __name__ == '__main__':
         if featStart is None:
             print("No startTime associated with this feature. Skipping this feature")
             continue
-
+        
+        #massagedLocationTimestamp = featStart.replace("Z", "+00:00")
+        #locationDatetime = datetime.fromisoformat(massagedLocationTimestamp)
+        #locationUnixsecs = locationDatetime.timestamp()
         #startdt = datetime.strptime(featStart, "%Y-%m-%dT%H:%M:%S%z");
 
         featEnd = featProperties.get('endTime')
@@ -237,7 +239,7 @@ if __name__ == '__main__':
 
                 if threshold_units == 'mph':
                     threshold = threshold * 0.868976
-                elif threshold_units == 'kts':
+                elif threshold_units == 'mps':
                     threshold = threshold * 1.934
 
                 distance_units = parameter.get('distanceUnits')
@@ -259,6 +261,6 @@ if __name__ == '__main__':
                     #print("comparison: " + comparison)
                     print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    workflow = hrrrWorkflow(configfile, featName, hazardType, comparison_str, threshold, inputfile)
+                    workflow = hrrrWindspeedWorkflow(configfile, featName, comparison_str, threshold, inputfile)
                     workflow.generate_workflow()
 
