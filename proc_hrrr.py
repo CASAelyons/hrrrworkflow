@@ -38,7 +38,8 @@ class hrrrWindspeedWorkflow(object):
         local_storage = Directory(Directory.LOCAL_STORAGE, "/home/ldm/hrrrworkflow/output")\
                 .add_file_servers(FileServer("file:///home/ldm/hrrrworkflow/output", Operation.ALL))
         
-        local = Site("local", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+        #local = Site("local", arch=Arch.X86_64, os_type=OS.LINUX, os_release="rhel", os_version="7")
+        local = Site("local")
 
         #local.add_directories(shared_scratch,local_storage, container_location)
         local.add_directories(shared_scratch,local_storage)
@@ -90,6 +91,8 @@ class hrrrWindspeedWorkflow(object):
             .add_transformations(d3hrrr_transformation)
             
         props = Properties()
+        props["pegasus.transfer.links"]="true"
+        props["pegasus.transfer.bypass.input.staging"]="true"
         props.write()
 
         d3_job = Job(d3hrrr_transformation)\
