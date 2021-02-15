@@ -14,12 +14,13 @@ from argparse import ArgumentParser
 
 
 class hrrrWindspeedWorkflow(object):
-    def __init__(self, configfile, featurename, comparison_str, threshold, inputfile):
+    def __init__(self, configfile, job_array, inputfile):
         
         self.configfile = configfile
-        self.featurename = '"' + featurename + '"'
-        self.comparison_str = '"' + comparison_str + '"'
-        self.threshold = threshold
+        self.job_array = job_array
+        #self.featurename = '"' + featurename + '"'
+        #self.comparison_str = '"' + comparison_str + '"'
+        #self.threshold = threshold
         self.inputfile = inputfile
 
     def generate_jobs(self):
@@ -64,7 +65,7 @@ class hrrrWindspeedWorkflow(object):
         #hrrrconfigfile = File(self.configfile)
         inputfile = File("latest_hrrr_80mWinds.netcdf")
         #inputfile = File(self.inputfile)
-
+        
         rc = ReplicaCatalog()\
              .add_replica("condorpool", hrrrconfigfile, "/nfs/shared/hrrr/d3_hrrr_windspeed.cfg")\
              .add_replica("condorpool", inputfile, "/nfs/shared/hrrr/latest_hrrr_80mWinds.netcdf")
@@ -95,22 +96,32 @@ class hrrrWindspeedWorkflow(object):
         props["pegasus.transfer.bypass.input.staging"]="true"
         props.write()
 
-        d3_job = Job(d3hrrr_transformation)\
-            .add_args("-c", hrrrconfigfile, "-n", self.featurename, "-e", self.comparison_str, "-t", self.threshold, inputfile)\
-            .add_inputs(hrrrconfigfile, inputfile)
+        for thisjob in job_array:
+            #add all the jobs
+            thisfeaturename = '"' + thisjob['featName'] + '"'
+            thisthreshold = thisjob['threshold']
+            thiscomparison_str = '"' + thisjob['comparison_str'] + '"'                                                                                                             
 
-        wf.add_jobs(d3_job)
+            d3_job = Job(d3hrrr_transformation)\
+                .add_args("-c", hrrrconfigfile, "-n", thisfeaturename, "-e", thiscomparison_str, "-t", thisthreshold, inputfile)\
+                .add_inputs(hrrrconfigfile, inputfile)
+
+            wf.add_jobs(d3_job)
+
         wf.add_site_catalog(sc)
         wf.add_replica_catalog(rc)
         wf.add_transformation_catalog(tc)
-        
-        try:
-            wf.plan(submit=True)
-            wf.wait()
-            wf.analyze()
-            wf.statistics()
-        except PegasusClientError as e:
-            print(e.output)
+
+        if (len(job_array) > 0) :
+            try:
+                wf.plan(submit=True)
+                wf.wait()
+                wf.analyze()
+                wf.statistics()
+            except PegasusClientError as e:
+                print(e.output)
+        else:
+            print("no flights in database, exiting")
 
     def generate_workflow(self):
         # Generate dax
@@ -160,7 +171,8 @@ if __name__ == '__main__':
     if features is None:
         print('No flights found.  Exiting')
         exit
-
+    
+    job_array = []
     for feature in features:
         
         featProperties = feature.get('properties')
@@ -264,6 +276,9 @@ if __name__ == '__main__':
                     #print("comparison: " + comparison)
                     print("alert on 80M winds " + comparison_str + " " + str(threshold) + " " + threshold_units + " within " + str(distance) + " " + distance_units + " from " + featName)
                     #d3cmd = "/home/elyons/bin/d3_hrrr -c /home/elyons/d3_hrrr/options.cfg -n \"" + featName + "\" -p \"WindSpeed\" -H \"" + hazardType + "\" -e " + comparison_str + " -t " + str(threshold) + " " + windsFile
-                    workflow = hrrrWindspeedWorkflow(configfile, featName, comparison_str, threshold, inputfile)
-                    workflow.generate_workflow()
+                    job_dict = {'featName': featName, 'comparison_str': comparison_str, 'threshold': threshold}
+                    job_array.append(job_dict)
+    #after processing all the features and products and params thereof
+    workflow = hrrrWindspeedWorkflow(configfile, job_array, inputfile)
+    workflow.generate_workflow()
 
